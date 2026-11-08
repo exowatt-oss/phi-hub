@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Self-hosted registry for sharing phi bundles." />
+    <!--
+      Inter via <link>, never a CSS @import: an @import inside a stylesheet is
+      only discovered after that sheet has been fetched and parsed, so every
+      paint waits on a serial Google Fonts round-trip. The two preconnects warm
+      the connection before the stylesheet link resolves.
+      Weights are deliberately 400 + 700 only — see the note in src/index.css.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+    <title>phi hub</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

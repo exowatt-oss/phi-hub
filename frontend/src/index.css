@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+
+/* Inter is loaded from three <link> tags in index.html, NOT from a CSS
+ * @import here: a runtime @import is only discovered once this sheet has been
+ * parsed, so it serialises the font fetch behind first paint. Only weights 400
+ * and 700 are requested — never set font-weight 500/600, the browser rounds
+ * them to a loaded face and the design intent silently disappears. */
+
+/* ----------------------------------------------------------------------------
+ * Neutral, overridable color tokens for self-hosted installations.
+ * Tailwind v4 picks up CSS vars declared in @theme as utility classes:
+ *   --color-* → bg-*, text-*, border-* utilities
+ *   --font-*  → font-* utilities
+ *   --radius-* → rounded-* utilities
+ * ----------------------------------------------------------------------------
+ */
+@theme {
+  /* Primary palette */
+  --color-ex-red: #3056a4;
+  --color-ex-orange: #29a4a0;
+  --color-ex-orange-mid: #4279bb;
+  --color-ex-gray: #7d7d7f;
+
+  /* Neutral scale (10 stops, white → near-black) */
+  --color-ex-neutral-0: #ffffff;
+  --color-ex-neutral-100: #f6f8fa;
+  --color-ex-neutral-200: #e2e4e9;
+  --color-ex-neutral-300: #cdd0d5;
+  --color-ex-neutral-400: #868c98;
+  --color-ex-neutral-500: #525866;
+  --color-ex-neutral-600: #31353f;
+  --color-ex-neutral-700: #20232d;
+  --color-ex-neutral-800: #161922;
+  --color-ex-neutral-900: #161922;
+
+  /* shadcn-style semantic aliases — keep close to the data-app palette */
+  --color-background: #ffffff;
+  --color-foreground: #161922;
+  --color-card: #ffffff;
+  --color-card-foreground: #161922;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #161922;
+  --color-primary: #3056a4;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f6f8fa;
+  --color-secondary-foreground: #161922;
+  --color-muted: #f6f8fa;
+  --color-muted-foreground: #525866;
+  --color-accent: #29a4a0;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #cc3344;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e4e9;
+  --color-input: #e2e4e9;
+  --color-ring: #29a4a0;
+
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+}
+
+/* Brand gradient (defined as a variable rather than a color so it works with
+ * `background:` and `background-image:` independent of Tailwind utilities). */
+:root {
+  --ex-gradient: linear-gradient(45deg, var(--color-ex-red), var(--color-ex-orange-mid) 50%, var(--color-ex-orange));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Brand utilities */
+.ex-bg-gradient {
+  background: var(--ex-gradient);
+  color: var(--color-ex-neutral-0);
+}
+
+.ex-text-brand {
+  background: var(--ex-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* The one gradient accent a data app gets to use on a card: a 3px stripe
+ * across the top edge. Lives here rather than as an inline `before:` utility
+ * chain because it is applied on several surfaces and the Tailwind spelling of
+ * a pseudo-element gradient is unreadable at call sites. */
+.ex-stripe-top {
+  position: relative;
+  overflow: hidden;
+}
+
+.ex-stripe-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--ex-gradient);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}

@@ -1,0 +1,13 @@
+Generic single-database configuration.
+
+Add a new revision:
+
+    uv run alembic revision --autogenerate -m "describe the change"
+
+Apply pending migrations:
+
+    uv run alembic upgrade head
+
+The app also runs `alembic upgrade head` on startup as a fallback for the
+internal-apps platform — until `pre_start_hooks` (app-platform#37) lands,
+that's the only post-deploy migration hook.

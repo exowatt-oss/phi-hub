@@ -1,0 +1,10 @@
+phi-hub
+Copyright 2026 Exowatt, Inc.
+
+This project uses psycopg and psycopg-binary (LGPL-3.0-only) as dynamically
+loaded Python dependencies. When redistributing their binary wheels or a
+container image that includes them, provide the LGPL license and corresponding
+library source and preserve the ability to replace the library. See
+https://www.psycopg.org/psycopg3/docs/basic/install.html for distribution
+choices. No proprietary SDK, production bundle data, or bundle content is
+included in this source release.
