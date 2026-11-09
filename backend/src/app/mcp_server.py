@@ -27,6 +27,7 @@ SDK note: ``mcp`` 2.x moved transport_security to streamable_http_app().
 from __future__ import annotations
 
 import base64
+import logging
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -44,6 +45,8 @@ from app.db import SessionLocal
 from app.deps import user_from_request_headers
 from app.models.bundle import IMPORT_ACTIONS, Bundle, BundleFile, BundleVersion
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 # The MCP spec has no HTTP status codes; a tool that fails raises, and the
 # client shows the message. These read as instructions to the agent on
@@ -64,15 +67,11 @@ def _headers(ctx: Context) -> Mapping[str, str]:
 
 def _identity(db: Session, ctx: Context) -> User:
     try:
-        user = user_from_request_headers(db, _headers(ctx))
+        user = user_from_request_headers(db, _headers(ctx), allow_mcp_headers=True)
     except InvalidIdentityToken as exc:
-        # A Bearer was present but didn't verify. Distinguish it from "no
-        # credential at all" — the fixes are completely different (rotate
-        # vs. sign in), and an agent that can't tell them apart will retry
-        # the wrong one forever.
+        logger.warning("MCP identity verification rejected: %s", exc)
         raise HubToolError(
-            f"The credential on this request failed verification ({exc}). "
-            "Re-run `/hub login`, or mint a fresh token at "
+            "Not authenticated. Re-run `/hub login`, or mint a fresh token at "
             f"{get_settings().public_base_url}/me."
         ) from exc
     if user is None:

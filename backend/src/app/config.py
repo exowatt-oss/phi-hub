@@ -34,10 +34,12 @@ class Settings(BaseSettings):
 
     # -------- Auth --------
     # No production identity is trusted by default. Forwarded mode requires
-    # an authenticated reverse proxy that strips incoming identity headers
-    # and prevents direct access to the app port. This temporary adapter is
-    # replaced by forwarded-auth when its public package is available.
-    auth_mode: str = Field(default="disabled")  # disabled | dev | forwarded
+    # an authenticated header-stripping edge with no direct backend access.
+    # OIDC mode verifies bearer JWTs without granting header-only trust.
+    auth_mode: str = Field(default="disabled")  # disabled | dev | forwarded | oidc
+    auth_issuer: str = Field(default="")
+    auth_jwks_url: str = Field(default="")  # optional; OIDC discovery if blank
+    auth_audience: str = Field(default="")  # comma-separated accepted audiences
     auth_trust_forwarded_headers: bool = Field(default=False)
     auth_email_header: str = Field(default="X-Auth-Request-Email")
     auth_name_header: str = Field(default="X-Auth-Request-Name")
@@ -47,6 +49,8 @@ class Settings(BaseSettings):
     auth_allowed_domains: str = Field(default="")  # comma-separated, exact domains
     auth_logout_url: str = Field(default="")
     auth_allowed_hosts: str = Field(default="")  # comma-separated MCP Host allowlist
+    auth_allow_loopback_hosts: bool = Field(default=False)  # explicit test/loopback opt-in
+    auth_allow_insecure_dev_mode: bool = Field(default=False)  # second explicit local-only opt-in
     dev_bypass_email: str = Field(default="dev@example.org")
     dev_bypass_name: str = Field(default="Dev User")
 
@@ -115,18 +119,40 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_auth_mode(self) -> Settings:
         """Refuse dev auth in production, and reject incomplete forwarded auth."""
-        if self.auth_mode not in {"disabled", "dev", "forwarded"}:
-            raise ValueError("AUTH_MODE must be disabled, dev, or forwarded")
+        if self.auth_mode not in {"disabled", "dev", "forwarded", "oidc"}:
+            raise ValueError("AUTH_MODE must be disabled, dev, forwarded, or oidc")
         local_environments = {"local", "dev", "development", "test"}
-        if self.auth_mode == "dev" and any(
+        if self.auth_mode == "dev":
+            if not self.auth_allow_insecure_dev_mode:
+                raise ValueError("AUTH_MODE=dev requires AUTH_ALLOW_INSECURE_DEV_MODE=true")
+            if any(
+                value.strip().lower() not in local_environments
+                for value in (self.environment, self.app_env)
+            ):
+                raise ValueError("AUTH_MODE=dev requires a local or test ENVIRONMENT and APP_ENV")
+        if self.auth_mode == "forwarded" and not self.auth_trust_forwarded_headers:
+            raise ValueError("forwarded auth requires AUTH_TRUST_FORWARDED_HEADERS=true")
+        if self.auth_mode in {"forwarded", "oidc"}:
+            domains = [domain.strip() for domain in self.auth_allowed_domains.split(",")]
+            if not any(domains) or any(not domain or "*" in domain for domain in domains):
+                raise ValueError("AUTH_ALLOWED_DOMAINS requires non-empty exact domains")
+            if not self.auth_issuer.strip() or not self.auth_audience.strip():
+                raise ValueError("verified auth requires AUTH_ISSUER and AUTH_AUDIENCE")
+        if self.auth_mode == "oidc" and (
+            self.auth_trust_forwarded_headers or self.auth_trust_mcp_headers
+        ):
+            raise ValueError("OIDC mode does not trust forwarded headers")
+        if (
+            self.auth_mode == "forwarded"
+            and self.auth_trust_mcp_headers
+            and not self.auth_trust_forwarded_headers
+        ):
+            raise ValueError("MCP header trust requires forwarded header trust")
+        if self.auth_allow_loopback_hosts and any(
             value.strip().lower() not in local_environments
             for value in (self.environment, self.app_env)
         ):
-            raise ValueError("AUTH_MODE=dev requires a local or test ENVIRONMENT and APP_ENV")
-        if self.auth_mode == "forwarded" and (
-            not self.auth_trust_forwarded_headers or not self.auth_allowed_domains.strip()
-        ):
-            raise ValueError("forwarded auth needs a trusted proxy and AUTH_ALLOWED_DOMAINS")
+            raise ValueError("MCP loopback hosts are only available in local/test environments")
         return self
 
     @property

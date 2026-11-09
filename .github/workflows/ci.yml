@@ -36,6 +36,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v6
+      # uv fetches forwarded-auth from GitHub. While it is private, CI needs
+      # explicit read access; this repo's GITHUB_TOKEN cannot read a sibling repo.
       - name: Install pinned dependencies
         run: uv sync --frozen
       - name: Migrate disposable database

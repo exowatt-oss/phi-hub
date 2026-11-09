@@ -6,6 +6,7 @@ installation denies all bundle access; device start/poll remain anonymous.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 
 from fastapi import Depends, HTTPException, Request, status
@@ -16,6 +17,8 @@ from app.config import get_settings
 from app.db import get_db
 from app.identity import find_or_create_profile, looks_like_app_token, user_for_app_token
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 
 def _bearer(headers: Mapping[str, str]) -> str | None:
@@ -28,12 +31,17 @@ def _bearer(headers: Mapping[str, str]) -> str | None:
     return credential.strip()
 
 
-def user_from_request_headers(db: Session, headers: Mapping[str, str]) -> User | None:
-    """Shared entry point for REST/MCP. A phk_ bearer always wins."""
+def user_from_request_headers(
+    db: Session, headers: Mapping[str, str], *, allow_mcp_headers: bool = False
+) -> User | None:
+    """Shared entry point; only the MCP tool caller may enable edge headers.
+
+    A phk_ bearer always wins. REST and device approval use the default.
+    """
     credential = _bearer(headers)
     if credential and looks_like_app_token(credential):
         return user_for_app_token(db, credential)
-    identity = user_from_headers(headers, get_settings())
+    identity = user_from_headers(headers, get_settings(), allow_mcp_headers=allow_mcp_headers)
     if identity is None:
         return None
     return find_or_create_profile(
@@ -56,7 +64,12 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     try:
         user = user_from_request_headers(db, request.headers)
     except InvalidIdentityToken as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+        logger.warning("Identity verification rejected: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

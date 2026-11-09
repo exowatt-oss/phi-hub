@@ -262,6 +262,14 @@ wheels = [
 ]
 
 [[package]]
+name = "forwarded-auth"
+version = "0.1.1"
+source = { git = "https://github.com/exowatt-oss/forwarded-auth?rev=58fd85f8ee6624c430aa23c3947d62f8840e5a52#58fd85f8ee6624c430aa23c3947d62f8840e5a52" }
+dependencies = [
+    { name = "pyjwt", extra = ["crypto"] },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -659,6 +667,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "forwarded-auth" },
     { name = "mcp" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
@@ -681,6 +690,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.18.5" },
     { name = "fastapi", specifier = ">=0.139.0" },
+    { name = "forwarded-auth", git = "https://github.com/exowatt-oss/forwarded-auth?rev=58fd85f8ee6624c430aa23c3947d62f8840e5a52" },
     { name = "mcp", specifier = "==2.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },

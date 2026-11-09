@@ -13,6 +13,7 @@ import re
 import secrets
 from datetime import UTC, datetime
 
+from forwarded_auth import InvalidIdentityToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -171,6 +172,8 @@ def find_or_create_profile(
     """
     email = (email or "").lower()
     user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if user is not None and user.is_org:
+        raise InvalidIdentityToken("Organization profiles cannot sign in")
     # "First HUMAN through the door", evaluated before this sign-in is
     # stamped. Both halves of that phrase matter now that the marketplace
     # seed pre-creates rows: an org profile is not a person, and a publisher

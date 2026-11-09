@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.auth_adapter import InvalidIdentityToken
 from app.db import SessionLocal
 from app.identity import handle_from_email, hash_token, unique_handle
 from app.models.user import User
@@ -163,10 +164,43 @@ def test_app_token_wins_over_mcp_worker_headers(
     assert resp.json()["profile"]["handle"] == "dev"
 
 
-def test_mcp_worker_headers_alone_authenticate(client: TestClient) -> None:
-    """The org mcp-edge Worker strips Authorization and stamps its own
-    identity headers; ``example_AUTH_TRUST_MCP_WORKER_HEADERS`` (set in
-    conftest, and by ops on the deployed app) is what makes them count."""
-    resp = client.get("/api/me", headers={"X-MCP-User-Email": "worker-user@example.com"})
-    assert resp.status_code == 200
-    assert resp.json()["profile"]["handle"] == "worker-user"
+def test_mcp_edge_headers_never_authenticate_rest_or_device(client: TestClient) -> None:
+    """AUTH_TRUST_MCP_HEADERS permits only /mcp, not browser/device routes."""
+    headers = {"X-MCP-User-Email": "edge-user@example.com"}
+    assert client.get("/api/me", headers=headers).status_code == 401
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+    assert client.get("/api/auth/device/pending?code=ABCDEFGH", headers=headers).status_code == 401
+    for action in ("approve", "deny"):
+        assert (
+            client.post(
+                f"/api/auth/device/{action}", json={"user_code": "ABCDEFGH"}, headers=headers
+            ).status_code
+            == 401
+        )
+    with SessionLocal() as db:
+        assert db.execute(select(User).where(User.email == "edge-user@example.com")).first() is None
+
+
+def test_org_profile_cannot_sign_in(client: TestClient) -> None:
+    """The seeded ORG_EMAIL can never become an interactive user."""
+    with SessionLocal() as db:
+        org = db.execute(select(User).where(User.email == "hub-org@example.com")).scalar_one()
+        assert org.is_org
+        assert org.last_sign_in_at is None
+    response = client.get("/api/me", headers={"X-Auth-Request-Email": "hub-org@example.com"})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+    with SessionLocal() as db:
+        org = db.execute(select(User).where(User.email == "hub-org@example.com")).scalar_one()
+        assert org.last_sign_in_at is None
+        assert not org.is_admin
+
+
+def test_org_profile_refused_by_identity_helper() -> None:
+    with SessionLocal() as db:
+        db.add(User(email="reserved@example.com", handle="reserved", is_org=True))
+        db.commit()
+        from app.identity import find_or_create_profile
+
+        with pytest.raises(InvalidIdentityToken, match="Organization profiles cannot sign in"):
+            find_or_create_profile(db, email="reserved@example.com", name="Reserved")

@@ -24,9 +24,8 @@ _JSON_HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json, text/event-stream",
 }
-# The identity the org's mcp-edge Worker stamps after Cloudflare Access
-# sign-in. Trusted here because conftest sets
-# example_AUTH_TRUST_MCP_WORKER_HEADERS=true (ops sets it in prod).
+# A separate authenticated MCP edge stamps these synthetic test identities.
+# Trusted only on /mcp because conftest sets AUTH_TRUST_MCP_HEADERS=true.
 _WORKER_IDENTITY = {
     "X-MCP-User-Email": "dev@example.com",
     "X-MCP-User-Name": "Dev User",
@@ -100,7 +99,7 @@ class McpSession:
 
 @pytest.fixture()
 def mcp(client: TestClient) -> McpSession:
-    """An MCP session authenticated as ``dev@example.com`` via Worker headers."""
+    """An MCP session authenticated as ``dev@example.com`` via edge headers."""
     return McpSession(client, _WORKER_IDENTITY)
 
 
@@ -143,17 +142,26 @@ def test_whoami_autocreates_the_profile(mcp: McpSession) -> None:
 
 
 def test_tools_refuse_an_unidentified_caller(client: TestClient) -> None:
-    """No Worker header, no token — every tool must say so rather than
+    """No edge header, no token — every tool must say so rather than
     silently acting as nobody."""
     session = McpSession(client, {})
     message = session.call_expecting_error("hub_whoami")
     assert "not signed in" in message.lower()
 
 
+def test_mcp_verification_errors_do_not_expose_policy(client: TestClient) -> None:
+    session = McpSession(client, {"X-MCP-User-Email": "intruder@unlisted.example"})
+    message = session.call_expecting_error("hub_whoami")
+    assert "Not authenticated" in message
+    assert "unlisted.example" not in message
+    assert "allowlist" not in message.lower()
+    assert "Re-run `/hub login`" in message
+
+
 def test_bearer_phk_token_authenticates_a_tool_call(
     client: TestClient, auth_client: TestClient
 ) -> None:
-    """A phi agent presents its app token instead of Worker headers."""
+    """A phi agent presents its app token instead of edge headers."""
     token = auth_client.post("/api/tokens", json={"name": "agent"}).json()["token"]
     session = McpSession(client, {"Authorization": f"Bearer {token}"})
     assert session.call("hub_whoami")["handle"] == "dev"
